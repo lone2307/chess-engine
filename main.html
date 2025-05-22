@@ -1,25 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Chess engine</title>
-    <meta charset="utf +8">
-    <script src="engine.js"></script>
-    <script src="game_rule.js"></script>
+  <meta charset="UTF-8">
+  <title>Chess Game</title>
+  <link rel="stylesheet" href="css/chessboard-1.0.0.min.css" />
+  <style>
+    #myBoard {
+      width: 400px;
+      margin: 20px auto;
+    }
+  </style>
 </head>
-    
 <body>
-    <div>
-        <div id="myBoard" style="width: 400px"></div>
-        <label>Status:</label>
-        <div id="status"></div>
-        <label>FEN:</label>
-        <div id="fen"></div>
-        <label>PGN:</label>
-        <div id="pgn"></div>
-    </div>
+  <h2 style="text-align:center;">Chess Game</h2>
+  <div id="myBoard"></div>
+
+  <!-- Load chessboard.js globally -->
+  <script src="js/chessboard-1.0.0.min.js"></script>
+
+  <!-- Load your script as an ES module -->
+  <script type="module" src="game_rule.js"></script>
 </body>
-<footer>
-
-</footer>
-
 </html>

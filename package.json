@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@chrisoakman/chessboardjs": "^1.0.0",
-    "chess.js": "^1.2.0"
+    "chess.js": "^1.2.0",
+    "express": "^5.1.0"
   }
 }
