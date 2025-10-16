@@ -1,54 +1,58 @@
-import { Chess } from 'node_modules/chess.js/dist/esm/chess.js';
+import { Chess } from '/node_modules/chess.js/dist/esm/chess.js';
+
 
 var board = null
 var game = new Chess()
 
 function onDragStart (source, piece, position, orientation) {
   // do not pick up pieces if the game is over
-  if (game.game_over()) return false
+  if (game.isGameOver()) return false;
 
   // only pick up pieces for White
-  if (piece.search(/^b/) !== -1) return false
+  if (piece.search(/^b/) !== -1) return false;
 }
 
-function blackMove () {
-  var possibleMoves = game.moves()
 
-  // game over
-  if (possibleMoves.length === 0) return
-    let best_move = 0
-    let best_score = Infinity
+function blackMove () {
+    var possibleMoves = game.moves();
+
+    if (possibleMoves.length === 0) return
+    let best_move = 0;
+    let best_score = Infinity;
     for (let x = 0; x < possibleMoves.length; x++){
-        let score = minimax(possibleMoves[x], 3, false, board)
+        const newGame = new Chess(game.fen());
+        newGame.move(possibleMoves[x]);
+        let score = minimax(3, false, newGame)
         if (score < best_score){
-            best_move = x
-            best_score = score
+            best_move = x;
+            best_score = score;
         }
     }
 
-  game.move(possibleMoves[best_move])
-  board.position(game.fen())
+    game.move(possibleMoves[best_move]);
+    board.position(game.fen());
 }
 
 function onDrop (source, target) {
   // see if the move is legal
+  if (source === target) return 'snapback';
+
   var move = game.move({
     from: source,
-    to: target,
-    promotion: 'q' // NOTE: always promote to a queen for example simplicity
+    to: target
   })
 
   // illegal move
-  if (move === null) return 'snapback'
+  if (move === null) return 'snapback';
 
-  // make random legal move for black
-  window.setTimeout(blackMove, 250)
+  // make legal move for black
+  window.setTimeout(blackMove, 60);
 }
 
 // update the board position after the piece snap
 // for castling, en passant, pawn promotion
 function onSnapEnd () {
-  board.position(game.fen())
+  board.position(game.fen());
 }
 
 var config = {
@@ -59,8 +63,8 @@ var config = {
   onSnapEnd: onSnapEnd
 }
 
-function eval_score(game) {
-    const value = { "r": 50, "n": 32, "b": 33, "q": 90, "p": 10, "k": 0 }
+function eval_score(gameInstance) {
+    const value = { r : 500, n: 320, b: 330, q: 900, p: 100, k: 0 }
     const eval_table = {
         "p": [
             0, 0, 0, 0, 0, 0, 0, 0,
@@ -124,44 +128,73 @@ function eval_score(game) {
         ]
     }
 
-    let score = 0
-    const cur_game = game.board()
-    for (let x = 0; x < cur_game.length; x++) {
-        for (let y = 0; y < cur_game[x].length; y++) {
-            const piece = cur_game[x][y]
-            if (piece) {
-                score += piece.color === 'w' ? eval_table[piece.type][8 * (x + 1) + y] + value[piece.type] : -eval_table[piece.type][8 * (7 - x + 1) + (7 - y)] - value[piece.type]
+    const centralSquares = ['d4', 'e4', 'd5', 'e5'];
+
+    let score = 0;
+    const board = gameInstance.board();
+
+    for (let x = 0; x < 8; x++) {
+        for (let y = 0; y < 8; y++) {
+            const piece = board[x][y];
+
+            if (!piece) continue;
+
+            const type = piece.type;      // lowercase: 'p', 'n', etc.
+            const color = piece.color;    // 'w' or 'b'
+
+            const baseVal = value[type] ?? 0;
+            const table = eval_table[type] ?? Array(64).fill(0); // fallback if type missing
+
+            const flipIdx = 8 * x + y;
+            const idx = 8 * (7 - x) + (7 - y);
+
+            const positionalVal = (color === 'w') ? table[idx] : -table[flipIdx];
+            const materialVal = (color === 'w') ? baseVal : -baseVal;
+
+            score += materialVal + positionalVal;
+            if (type === 'k') {
+                if ((color === 'w' && y < 2) || (color === 'b' && y < 2)) {
+                        score += color === 'w' ? -30 : 30; // king on side = safer
+                    }
             }
         }
     }
-    return score
+
+    for (const sq of centralSquares) {
+        const piece = gameInstance.get(sq);
+        if (piece) {
+            score += piece.color === 'w' ? 20 : -20;
+        }
+    }
+
+    return score;
 }
 
-function minimax(move, depth, maxPlayer, board, alpha = -Infinity, beta = Infinity) {
-    if (depth === 0 | board.isGameOver()) {
-        return eval_score(board)
+function minimax(depth, maxPlayer, gameInstance, alpha = -Infinity, beta = Infinity) {
+    if (depth === 0 || gameInstance.isGameOver()) {
+        return eval_score(gameInstance)
     } else if (maxPlayer) {
-        let max = -Infinity
-        for (const pos_move of board.moves()) {
-            const newGame = new Chess(board.fen());
-            newGame.move(pos_move)
-            const value = minimax(move, depth - 1, !maxPlayer, newGame, alpha, beta)
-            max = Math.max(max, value)
-            alpha = Math.max(alpha, max)
+        let highest = -Infinity
+        for (const pos_move of gameInstance.moves()) {
+            const newGame = new Chess(gameInstance.fen());
+            newGame.move(pos_move);
+            const value = minimax(depth - 1, false, newGame, alpha, beta)
+            highest = Math.max(highest, value)
+            alpha = Math.max(alpha, highest)
             if (beta <= alpha) break
         }
-        return max
+        return highest
     } else {
-        let min = Infinity
-        for (const pos_move of board.moves()) {
-            const newGame = new Chess(board.fen());
+        let lowest = Infinity
+        for (const pos_move of gameInstance.moves()) {
+            const newGame = new Chess(gameInstance.fen());
             newGame.move(pos_move)
-            const value = minimax(move, depth - 1, !maxPlayer, newGame, alpha, beta)
-            min = Math.min(min, value)
-            beta = Math.min(beta, min)
+            const value = minimax(depth - 1, true, newGame, alpha, beta)
+            lowest = Math.min(lowest, value)
+            beta = Math.min(beta, lowest)
             if (beta <= alpha) break
         }
-        return min
+        return lowest
     }
 }
 
